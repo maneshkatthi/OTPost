@@ -822,6 +822,6 @@ Built with ❤️ as a learning project in full-stack web development.
 
 **[⭐ Star this repo](https://github.com/maneshkatthi/OTPost)** if you found it helpful!
 
-Made by [Manesh Katthi :) (https://github.com/maneshkatthi)
+Made by [Manesh Katthi ](https://github.com/maneshkatthi)
 
 </div>
