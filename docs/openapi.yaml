@@ -1,0 +1,178 @@
+openapi: 3.0.3
+info:
+  title: Email OTP Auth API
+  version: 1.0.0
+  description: Passwordless login using a one-time code sent by email. Sessions use an HttpOnly cookie.
+servers:
+  - url: http://localhost:4000/api/v1
+tags:
+  - name: Auth
+
+paths:
+  /auth/request-otp:
+    post:
+      tags: [Auth]
+      summary: Request a one-time code by email
+      description: Always returns 200 for a well-formed email, whether or not an account exists (prevents user enumeration).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestOtpBody' }
+      responses:
+        '200':
+          description: Code sent (if the email is valid)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: If the email is valid, a code has been sent. }
+                  resendAfter: { type: integer, example: 60 }
+        '400': { $ref: '#/components/responses/InvalidEmail' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify the code and start a session
+      description: Wrong, expired, consumed and locked codes all return the same generic INVALID_CODE error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyOtpBody' }
+      responses:
+        '200':
+          description: Logged in. Session cookie is set.
+          headers:
+            Set-Cookie:
+              description: "sid=<64 hex>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800"
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Invalid input or invalid/expired code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalidCode:
+                  value: { error: { code: INVALID_CODE, message: Invalid or expired code } }
+                invalidInput:
+                  value: { error: { code: INVALID_INPUT, message: Email and 6-digit code are required } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the currently logged-in user
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Valid session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out of this device
+      description: Idempotent. Always returns 204 and clears the cookie.
+      responses:
+        '204': { description: Logged out }
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Log out of every device
+      security:
+        - cookieAuth: []
+      responses:
+        '204': { description: All sessions deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+
+  schemas:
+    RequestOtpBody:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254, example: sam@gmail.com }
+    VerifyOtpBody:
+      type: object
+      required: [email, otp]
+      properties:
+        email: { type: string, format: email, maxLength: 254, example: sam@gmail.com }
+        otp:
+          type: string
+          pattern: '^[0-9]{6}$'
+          example: '042913'
+          description: String, not number, to keep leading zeros.
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [INVALID_EMAIL, INVALID_INPUT, INVALID_CODE, UNAUTHENTICATED, COOLDOWN, RATE_LIMITED, SERVER_ERROR]
+            message: { type: string }
+
+  responses:
+    InvalidEmail:
+      description: Malformed email
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: INVALID_EMAIL, message: Please enter a valid email } }
+    Unauthenticated:
+      description: No valid session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: UNAUTHENTICATED, message: Not logged in } }
+    TooManyRequests:
+      description: Per-email cooldown (COOLDOWN) or per-IP limit (RATE_LIMITED)
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            cooldown:
+              value: { error: { code: COOLDOWN, message: Please wait before requesting another code } }
+            rateLimited:
+              value: { error: { code: RATE_LIMITED, message: Too many requests. Try again later. } }
+    ServerError:
+      description: Unexpected error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: SERVER_ERROR, message: Something went wrong } }
