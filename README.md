@@ -2,9 +2,9 @@
 
 # 📬 OTPost
 
-### Passwordless · Secure · Open Source
+### Generate · Send · Verify — Free & Unlimited OTPs via SMTP
 
-**A production-ready, passwordless authentication system powered by Email One-Time Passwords.**
+**A production-ready OTP generation and delivery system powered by Gmail SMTP.**
 
 Built with Node.js + Express · React + Vite · Supabase (PostgreSQL) · Nodemailer
 
@@ -17,50 +17,140 @@ Built with Node.js + Express · React + Vite · Supabase (PostgreSQL) · Nodemai
 
 ---
 
-## 📖 Table of Contents
+## 🚀 TL;DR — What is this?
 
-1. [What is OTPost?](#-what-is-otpost)
-2. [Why Passwordless?](#-why-passwordless)
-3. [Feature Highlights](#-feature-highlights)
-4. [How It Works — The Complete Flow](#-how-it-works--the-complete-flow)
-5. [System Architecture](#-system-architecture)
-6. [Project Structure](#-project-structure)
-7. [Security Deep Dive](#-security-deep-dive)
-8. [Database Schema](#-database-schema)
-9. [API Reference](#-api-reference)
-10. [Gmail SMTP Setup Guide](#-gmail-smtp-setup-guide)
-11. [Local Development Setup](#-local-development-setup)
-12. [Environment Variables Reference](#-environment-variables-reference)
-13. [Deployment Guide](#-deployment-guide)
-14. [Tech Stack](#-tech-stack)
-15. [Contributing](#-contributing)
-16. [License](#-license)
+You know those **6-digit verification codes** you get from banks, Instagram, or WhatsApp when you log in? OTPost lets you **send those exact same codes** to any email address — **for free, with no limits** — using just a Gmail account.
+
+That's it. No paid services. No complex setup. Just clone this repo, plug in your Gmail, and you have a working OTP system.
+
+```
+You (or your app)  →  OTPost  →  Gmail sends the code  →  User's inbox 📩
+```
+
+---
+
+## 🎯 Who is this for?
+
+| You are... | Why you'd want this |
+|---|---|
+| 🧑‍💻 **A vibe coder** building with AI agents | Drop this into your project and tell your AI agent *"add email OTP login using OTPost"* — it handles the rest |
+| 📱 **Building a side project** that needs login | No need to pay for Auth0, Firebase, or Twilio — OTPost gives you OTP auth for $0 |
+| 🎓 **A student** learning backend development | See how real-world email delivery, cryptography, and API design actually work |
+| 🏗️ **A developer** who wants a starter template | Fork it, customize it, ship it — it's production-ready out of the box |
+
+---
+
+## 🤖 Just Tell Your AI Agent
+
+If you use AI coding tools (Cursor, Copilot, Windsurf, Claude Code, Antigravity, etc.), you don't even need to figure out the code yourself. Just pick your scenario and paste the prompt:
+
+### Scenario 1 — "I already have an app, I just want the OTP logic" (No frontend needed)
+> *"Look at the repository https://github.com/maneshkatthi/OTPost. I do NOT need the `web/` frontend folder. Extract just the backend OTP generation, Gmail SMTP mailer (`server/src/lib/`), and the Supabase SQL schema (`db/schema.sql`) and integrate it directly into my current project using my Gmail credentials."*
+
+### Scenario 2 — "I want to run the whole project to test it out"
+> *"Clone https://github.com/maneshkatthi/OTPost and set it up locally for me. Follow the README to install dependencies for both `server/` and `web/`, create the `.env` file, and run both dev servers so I can test OTP login in my browser."*
+
+---
+
+## 📦 How to Use This Repo (Pick What You Need)
+
+You don't have to use everything in this repository! Here is how to take only what fits your project:
+
+```
+OTPost/
+├── 📂 server/    ← ⚡ THE CORE ENGINE (OTP generator, HMAC hasher, Gmail SMTP sender)
+├── 📂 db/        ← 🗄️ DATABASE (PostgreSQL / Supabase schema for OTP & session storage)
+├── 📂 web/        ← 🎨 OPTIONAL DEMO (A React frontend to test the flow visually)
+└── 📂 docs/       ← 📖 API SPECS (OpenAPI / Swagger docs)
+```
+
+| If your goal is... | What to do |
+|---|---|
+| **I only want the backend OTP API** | Clone the repo, take the `server/` and `db/` folders, and **delete `web/`**. Your backend is 100% standalone and works with any frontend (React, Next.js, Flutter, Vue, mobile apps, etc.). |
+| **I want to copy just the core logic into my own server** | You only need 3 files: <br>1. `server/src/lib/otp.js` (CSPRNG generation + HMAC hash) <br>2. `server/src/lib/mailer.js` (Nodemailer Gmail SMTP sender) <br>3. `db/schema.sql` (Database tables) |
+| **I want a full working demo out-of-the-box** | Run both `server/` and `web/` (see [Quick Start](#-local-development-setup)). |
+
+> 💡 **Pro-Tip: Git Sparse Checkout (Clone without the `web/` folder)**
+> If you don't want to download the React frontend at all, run this in your terminal to download **only** `server` and `db`:
+> ```bash
+> git clone --filter=blob:none --sparse https://github.com/maneshkatthi/OTPost.git
+> cd OTPost
+> git sparse-checkout set server db
+> ```
 
 ---
 
 ## 🤔 What is OTPost?
 
-OTPost is a **complete, self-contained passwordless login system** that authenticates users using a **6-digit one-time code** sent to their email address. No passwords, no password resets, no password leaks.
+OTPost is a **complete OTP (One-Time Password) generation and delivery system** that generates secure 6-digit codes and sends them to any email address via **Gmail SMTP** — completely **free**.
 
-The user simply enters their email → receives a code in their inbox → enters the code → they're logged in with a secure session cookie. That's it.
+**In plain English:**
+- User enters their email → your server generates a random 6-digit code → Gmail delivers it to their inbox → user types the code → they're verified ✅
+- The codes **expire in 5 minutes**, can only be used **once**, and are **locked after 5 wrong guesses**
+- New users are **automatically registered** on their first successful verification — no signup form needed
 
-OTPost is designed as:
-- A **learning project** covering backend development, PostgreSQL, REST API design, authentication security, and React frontend.
-- A **production-ready starter** that can be dropped into any real application.
-- A **reference implementation** for secure email OTP auth with proper cryptographic practices.
+**Why it's worth your time:**
+- 💰 **$0 cost** — Gmail SMTP is free (500 emails/day personal, 2000/day with Google Workspace)
+- ⚡ **Works in minutes** — clone, configure Gmail, run
+- 🔒 **Actually secure** — codes are cryptographically generated and never stored in plain text
+- 🎨 **Looks good** — comes with a polished React UI with animations, auto-advancing inputs, and paste support
+- 🧩 **Plug and play** — use the full app, or just grab the backend API for your own frontend
+
+> **Key idea:** Gmail SMTP with an App Password gives you **unlimited free OTP emails** using just a standard Gmail account. No credit card, no API key purchase, no monthly limits.
 
 ---
 
-## 💡 Why Passwordless?
+## 📖 Table of Contents
 
-| Problem with Passwords | OTPost Solution |
-|---|---|
-| Users reuse passwords across sites | No passwords exist to reuse or leak |
-| Password breaches expose millions | Database only stores HMAC hashes of OTPs |
-| Password reset flows are complex | Login IS the reset — just request a new code |
-| Users forget passwords | Email is the credential — always accessible |
-| Phishing harvests passwords | A stolen OTP is useless after 5 minutes |
-| "Forgot password?" friction | Single-step login from any device |
+1. [TL;DR — What is this?](#-tldr--what-is-this)
+2. [Who is this for?](#-who-is-this-for)
+3. [Just Tell Your AI Agent](#-just-tell-your-ai-agent)
+4. [How to Use This Repo (Pick What You Need)](#-how-to-use-this-repo-pick-what-you-need)
+5. [What is OTPost?](#-what-is-otpost)
+6. [Why Gmail SMTP? (Free & Unlimited)](#-why-gmail-smtp-free--unlimited)
+7. [Feature Highlights](#-feature-highlights)
+8. [How It Works — The Complete OTP Flow](#-how-it-works--the-complete-otp-flow)
+9. [System Architecture](#-system-architecture)
+10. [Project Structure](#-project-structure)
+11. [Security Deep Dive](#-security-deep-dive)
+12. [Database Schema](#-database-schema)
+13. [API Reference](#-api-reference)
+14. [Gmail SMTP Setup Guide](#-gmail-smtp-setup-guide)
+15. [Local Development Setup](#-local-development-setup)
+16. [Environment Variables Reference](#-environment-variables-reference)
+17. [Deployment Guide](#-deployment-guide)
+18. [Tech Stack](#-tech-stack)
+19. [Contributing](#-contributing)
+20. [License](#-license)
+
+---
+
+## 📨 Why Gmail SMTP? (Free & Unlimited)
+
+**SMTP** (Simple Mail Transfer Protocol) is the standard internet protocol used to **send emails** between servers. It's the same protocol that every email client and service (Gmail, Outlook, Yahoo, etc.) uses under the hood to deliver messages. When OTPost needs to send a 6-digit code to a user's inbox, it connects to Gmail's SMTP server (`smtp.gmail.com`) and hands the email off — Gmail then delivers it to the recipient, just like any normal email.
+
+> 💡 Think of SMTP as the "postal system" for email — it's the universal delivery mechanism that moves your message from the sender's server to the recipient's inbox.
+
+| Method | Cost | Limits | Setup |
+|---|---|---|---|
+| **Gmail SMTP (this project)** | **Free** | 500 emails/day (personal), 2000/day (Workspace) | One-time App Password setup |
+| Twilio SMS | Paid | Per-message cost | Paid account + phone number |
+| SendGrid | Free tier limited | 100/day free, then paid | API key + domain verification |
+| AWS SES | Paid after free tier | Limited free tier | Complex AWS setup |
+| Firebase Auth SMS | Paid after quota | Limited free quota | Firebase project setup |
+
+Gmail SMTP is the **fastest way to get real OTP delivery working** for free:
+- ✅ No payment method required
+- ✅ No domain verification needed
+- ✅ Works immediately after enabling an App Password
+- ✅ Reliable delivery with Google's infrastructure
+- ✅ HTML-formatted emails with professional styling
+
+> [!TIP]
+> **Need higher daily limits?**
+> If you feel Gmail's single-account SMTP limit (~500 emails/day) isn't enough for your needs, you can simply ask your coding agent:  
+> *"Add a fallback / round-robin rotation with multiple Gmail accounts"*  
+> and provide multiple Gmail addresses with their respective App Passwords to easily scale your daily OTP volume for free!
 
 ---
 
@@ -80,7 +170,7 @@ OTPost is designed as:
 
 ---
 
-## 🔄 How It Works — The Complete Flow
+## 🔄 How It Works — The Complete OTP Flow
 
 ### Step 1 — User Enters Email
 
@@ -102,18 +192,18 @@ The server:
 4. **Invalidates older codes** — marks any unconsumed OTPs for this email as consumed.
 5. **Generates a new OTP** using `crypto.randomInt(0, 1_000_000)` — cryptographically secure, no modulo bias.
 6. **Hashes the OTP** using `HMAC-SHA256(email:otp, OTP_PEPPER)` and stores only the hash.
-7. **Sends the email** asynchronously via Nodemailer (Gmail SMTP).
+7. **Sends the email** via Gmail SMTP through Nodemailer — the plaintext OTP goes only to the inbox, never stored.
 
 ```text
 Backend                                                    Database
   |-- Invalidate old OTPs for email ----------------------->|
   |-- INSERT { email, otp_hash, expires_at: +5min } ------->|
-  |-- Send email with plaintext OTP (via Gmail SMTP) ------> user's inbox
+  |-- Send OTP email via Gmail SMTP (FREE) ---------------> user's inbox
   |
   |<-- Returns 200: { message: "...", resendAfter: 60 }
 ```
 
-> **Security note:** The response is always the same whether the email exists in the system or not. This prevents **user enumeration**.
+> **Key point:** The OTP plaintext **only ever exists in two places**: the server's memory (milliseconds) and the user's email inbox. The database stores only an HMAC hash — even a full database breach leaks nothing.
 
 ### Step 3 — User Enters the 6-Digit Code
 
@@ -186,7 +276,7 @@ Every subsequent page load, the browser automatically sends the `sid` cookie. Th
                        │  HTTP + HttpOnly Cookies
                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│               EXPRESS AUTH SERVER (Node.js, port 4000)              │
+│               EXPRESS OTP SERVER (Node.js, port 4000)               │
 │                                                                     │
 │   Security Layer: helmet · cors · express.json (10kb limit)         │
 │   Rate Limiting:  express-rate-limit (per IP)                       │
@@ -210,13 +300,14 @@ Every subsequent page load, the browser automatically sends the `sid` cookie. Th
 ┌─────────────────────────┐  ┌────────────────────────────────────────┐
 │  SUPABASE (PostgreSQL)  │  │  GMAIL SMTP (via Nodemailer)            │
 │                         │  │                                        │
-│  Tables:                │  │  App Password auth (not your main      │
-│  • users                │  │  Google password)                      │
-│  • otps (hashes only)   │  │                                        │
-│  • sessions (hashes)    │  │  Sends HTML-formatted OTP email        │
-│                         │  │  with 5-minute expiry notice           │
-│  RLS enabled on all     │  │                                        │
-│  tables (deny public)   │  └────────────────────────────────────────┘
+│  Tables:                │  │  ✅ FREE — No payment needed           │
+│  • users                │  │  ✅ Unlimited OTPs (500/day personal)  │
+│  • otps (hashes only)   │  │  ✅ App Password auth (not your main   │
+│  • sessions (hashes)    │  │     Google password)                   │
+│                         │  │                                        │
+│  RLS enabled on all     │  │  Sends HTML-formatted OTP email        │
+│  tables (deny public)   │  │  with 5-minute expiry notice           │
+│                         │  └────────────────────────────────────────┘
 │                         │
 │  Functions:             │
 │  • increment_otp_attempts (atomic)
@@ -361,7 +452,7 @@ CREATE TABLE users (
   CONSTRAINT users_email_lowercase CHECK (email = lower(email))
 );
 ```
-Users are automatically created on their first successful login. No registration form required.
+Users are automatically created on their first successful OTP verification. No registration form required.
 
 ### `otps` table
 ```sql
@@ -407,7 +498,7 @@ All error responses share this shape:
 
 ### `POST /request-otp`
 
-Generates and emails a 6-digit OTP to the provided address.
+Generates a cryptographically secure 6-digit OTP and delivers it to the given email address via Gmail SMTP (free, no limits).
 
 **Request body:**
 ```json
@@ -521,7 +612,7 @@ Destroys **all active sessions** for the authenticated user across all devices. 
 
 ## 📧 Gmail SMTP Setup Guide
 
-OTPost uses **Gmail SMTP** via Nodemailer to send OTP emails. Gmail requires an **App Password** — a special 16-character password for third-party apps that is separate from your main Google account password.
+OTPost uses **Gmail SMTP** via Nodemailer to deliver OTPs. This is completely **free** — no paid plan, no credit card. You only need a Gmail account and an **App Password** — a special 16-character credential for third-party apps, separate from your main Google account password.
 
 > ⚠️ **Never use your real Google account password.** App Passwords are safe to use and can be revoked at any time without affecting your main account.
 
@@ -557,7 +648,7 @@ The spaces in the App Password are fine — Nodemailer handles them correctly.
 
 ### Step 4 — Verify It Works
 
-After starting the backend server, trigger an OTP from the frontend and check your inbox. Emails typically arrive within 5-15 seconds.
+After starting the backend server, request an OTP from the frontend and check your inbox. Emails typically arrive within 5–15 seconds via Gmail's SMTP infrastructure.
 
 **Troubleshooting:**
 
@@ -608,7 +699,7 @@ export const transporter = nodemailer.createTransport({
 | [Node.js](https://nodejs.org) | v18.0.0+ | Check: `node --version` |
 | [Git](https://git-scm.com) | Any | For cloning |
 | [Supabase Account](https://supabase.com) | Free tier | For the database |
-| Gmail Account | — | For email delivery |
+| Gmail Account | — | For free SMTP OTP delivery |
 
 ---
 
@@ -706,7 +797,7 @@ You should see:
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 1. Enter your email address and click **Send verification code**.
-2. Check your inbox for the 6-digit code.
+2. Check your inbox — you'll receive a **6-digit OTP via Gmail SMTP** (free, arrives in seconds).
 3. Type or paste the code into the boxes.
 4. You're logged in! 🎉
 
@@ -724,8 +815,8 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 | `SUPABASE_URL` | Yes | `https://xxx.supabase.co` | Your Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | `eyJhbGci...` | Supabase service role key — **backend only, never expose** |
 | `OTP_PEPPER` | Yes | `c95968...` | 32-byte hex secret for HMAC-SHA256 OTP hashing |
-| `GMAIL_USER` | Yes | `you@gmail.com` | Gmail address to send OTPs from |
-| `GMAIL_APP_PASSWORD` | Yes | `abcd efgh ijkl mnop` | Gmail App Password (see setup guide above) |
+| `GMAIL_USER` | Yes | `you@gmail.com` | Gmail address to send OTPs from (SMTP sender) |
+| `GMAIL_APP_PASSWORD` | Yes | `abcd efgh ijkl mnop` | Gmail App Password — enables free SMTP delivery (see setup guide) |
 
 ### Generating a Secure OTP Pepper
 
@@ -770,7 +861,7 @@ Paste the output into your `.env` as `OTP_PEPPER`. Keep it secret — changing i
 | [cookie-parser](https://github.com/expressjs/cookie-parser) | ^1 | Read `sid` cookie from requests |
 | [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | ^7 | IP-based request rate limiting |
 | [@supabase/supabase-js](https://github.com/supabase/supabase-js) | ^2 | Supabase PostgreSQL client |
-| [nodemailer](https://nodemailer.com) | ^7 | SMTP email transport |
+| [nodemailer](https://nodemailer.com) | ^7 | Gmail SMTP transport for free OTP email delivery |
 | [dotenv](https://github.com/motdotla/dotenv) | ^16 | `.env` file loader |
 | Node.js `crypto` | built-in | CSPRNG, HMAC-SHA256, SHA-256, timingSafeEqual |
 
@@ -788,6 +879,12 @@ Paste the output into your `.env` as `OTP_PEPPER`. Keep it secret — changing i
 | [Supabase](https://supabase.com) | Hosted PostgreSQL with REST API |
 | PostgreSQL | Relational database |
 | Row Level Security | Table-level access control |
+
+### Email Delivery (Free)
+| Tool | Cost | Purpose |
+|---|---|---|
+| Gmail SMTP | **Free** | OTP email delivery — 500 emails/day (personal), 2000/day (Workspace) |
+| Nodemailer | Free (npm) | SMTP transport library |
 
 ---
 
@@ -818,7 +915,7 @@ This project is open-source and available under the **[MIT License](./LICENSE)**
 
 <div align="center">
 
-Built with ❤️ as a learning project in full-stack web development.
+Built with ❤️ as a learning project in full-stack development, SMTP email delivery, and cryptographic OTP security.
 
 **[⭐ Star this repo](https://github.com/maneshkatthi/OTPost)** if you found it helpful!
 
