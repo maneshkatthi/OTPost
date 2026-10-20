@@ -46,13 +46,13 @@ app.use(express.json({ limit: '10kb' }));
 // Cookie parsing for session identification
 app.use(cookieParser());
 
-// Health check endpoint
-app.get('/api/v1/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check and root status endpoint
+app.get(['/', '/api', '/api/v1', '/api/v1/health', '/v1/health', '/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'otpost-api', timestamp: new Date().toISOString() });
 });
 
-// Mount authentication API
-app.use('/api/v1/auth', authRouter);
+// Mount authentication API to support direct Express server, Vercel serverless with or without /api prefix
+app.use(['/api/v1/auth', '/v1/auth', '/auth'], authRouter);
 
 // 404 handler
 app.use((req, res) => {

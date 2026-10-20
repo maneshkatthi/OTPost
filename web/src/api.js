@@ -3,10 +3,17 @@
  * All calls go to /api/v1/auth via the Vite dev proxy.
  */
 
-// In production on Vercel/Render, VITE_API_URL points to the backend server (e.g. https://my-server.vercel.app).
-// In local development, it defaults to '' and relies on Vite proxy.
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
-const BASE = `${API_URL}/api/v1/auth`;
+// Normalize API base URL: handles any user format in VITE_API_URL cleanly
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const BASE = rawApiUrl.endsWith('/api/v1/auth')
+  ? rawApiUrl
+  : rawApiUrl.endsWith('/api/v1')
+  ? `${rawApiUrl}/auth`
+  : rawApiUrl.endsWith('/api')
+  ? `${rawApiUrl}/v1/auth`
+  : rawApiUrl
+  ? `${rawApiUrl}/api/v1/auth`
+  : '/api/v1/auth';
 
 async function request(method, path, body) {
   const url = `${BASE}${path}`;
@@ -25,9 +32,20 @@ async function request(method, path, body) {
   // 204 No Content
   if (res.status === 204) return null;
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const rawText = await res.text();
+  // Safely read response text first to prevent "Unexpected end of JSON input" errors
+  const rawText = await res.text();
+
+  if (!rawText || !rawText.trim()) {
+    if (!res.ok) {
+      throw new Error(`Backend returned HTTP ${res.status} with an empty response at ${url}. Check your Vercel backend logs.`);
+    }
+    return null;
+  }
+
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (parseErr) {
     if (res.status === 404) {
       throw new Error(
         `API endpoint not found (404) at ${url}.\n\n` +
@@ -36,10 +54,8 @@ async function request(method, path, body) {
         `2. Add Environment Variable VITE_API_URL=<your-backend-url> in your Vercel frontend project settings and redeploy.`
       );
     }
-    throw new Error(`Server returned HTTP ${res.status} non-JSON response: ${rawText.slice(0, 100)}`);
+    throw new Error(`Server returned HTTP ${res.status} non-JSON response: ${rawText.slice(0, 120)}`);
   }
-
-  const data = await res.json();
 
   if (!res.ok) {
     const err = new Error(data?.error?.message || 'Request failed');
