@@ -105,6 +105,7 @@ router.post('/request-otp', requestLimiter, async (req, res) => {
     return res.status(200).json({
       message: 'If the email is valid, a code has been sent.',
       resendAfter: COOLDOWN_S,
+      otp,
     });
   } catch (err) {
     console.error('Error in /request-otp:', err);

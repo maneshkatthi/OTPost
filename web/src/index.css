@@ -722,6 +722,139 @@ body {
 
 .security-row span { color: var(--text-muted); }
 
+/* ---------- Live Demo OTP Preview Card ---------- */
+.otp-live-card {
+  margin-bottom: 22px;
+  background: linear-gradient(135deg, rgba(91, 107, 240, 0.12) 0%, rgba(6, 214, 214, 0.06) 100%);
+  border: 1px solid rgba(91, 107, 240, 0.35);
+  box-shadow: 0 0 24px rgba(91, 107, 240, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  text-align: left;
+  animation: stepEnter 0.3s var(--ease-out);
+}
+
+.otp-live-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.otp-live-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--accent-cyan);
+  background: rgba(6, 214, 214, 0.12);
+  border: 1px solid rgba(6, 214, 214, 0.3);
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+}
+
+.otp-autofill-btn {
+  background: rgba(91, 107, 240, 0.2);
+  border: 1px solid var(--border-brand);
+  color: var(--brand-300);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.otp-autofill-btn:hover {
+  background: var(--brand-500);
+  color: #ffffff;
+  border-color: var(--brand-400);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(91, 107, 240, 0.4);
+}
+
+.otp-live-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.otp-live-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.otp-live-label strong {
+  color: #ffffff;
+}
+
+.otp-live-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.otp-live-digits {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(91, 107, 240, 0.6);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.otp-live-footer-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--brand-200);
+  margin-top: 4px;
+}
+
+.otp-live-footer-text strong {
+  color: #ffffff;
+}
+
+/* ---------- GitHub Repo Link in Login Card ---------- */
+.github-card-link {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: center;
+}
+
+.github-star-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  transition: all 0.2s ease;
+}
+
+.github-star-pill:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2);
+}
+
+.github-star-pill .star-icon {
+  font-size: 14px;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 480px) {
   .card { padding: 28px 20px; }
