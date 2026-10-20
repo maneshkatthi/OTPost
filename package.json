@@ -7,6 +7,12 @@
   "bin": {
     "otpost": "./bin/cli.js"
   },
+  "files": [
+    "bin",
+    "otpost.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "node scripts/dev.js",
     "start": "node otpost.js",

@@ -1,0 +1,8 @@
+server/
+web/
+scripts/
+docs/
+.env*
+*.log
+.git
+.github
