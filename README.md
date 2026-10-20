@@ -105,7 +105,7 @@ OTPost is a **complete OTP (One-Time Password) generation and delivery system** 
 9. [System Architecture](#-system-architecture)
 10. [Project Structure](#-project-structure)
 11. [Security Deep Dive](#-security-deep-dive)
-12. [Database Schema](#-database-schema)
+12. [Zero-Database Stateless Architecture](#-zero-database-stateless-architecture)
 13. [API Reference](#-api-reference)
 14. [Gmail SMTP Setup Guide](#-gmail-smtp-setup-guide)
 15. [Local Development Setup](#-local-development-setup)
@@ -162,17 +162,17 @@ Gmail SMTP is the **fastest way to get real OTP delivery working** for free:
 
 ---
 
-## 🔄 How It Works — The Complete OTP Flow
+## 🔄 How It Works — The Complete Zero-Database Flow
 
 ### Step 1 — User Enters Email
 
 The user visits the login page and enters their email address. The React frontend submits it to the backend.
 
 ```text
-Browser                          Backend (Express)              Database (Supabase)
-  |                                     |                               |
-  |-- POST /api/v1/auth/request-otp --> |                               |
-  |   { email: "user@example.com" }     |                               |
+Browser                          Backend (Express / otpost.js)
+  |                                     |
+  |-- POST /api/v1/auth/request-otp --> |
+  |   { email: "user@example.com" }     |
 ```
 
 ### Step 2 — Backend Validates & Generates OTP
@@ -180,71 +180,66 @@ Browser                          Backend (Express)              Database (Supaba
 The server:
 1. **Normalises** the email (trim + lowercase).
 2. **Validates** format with a regex (no network call to check if email exists).
-3. **Checks cooldown** — queries the database for an OTP created within the last 60 seconds. If found, returns 429.
-4. **Invalidates older codes** — marks any unconsumed OTPs for this email as consumed.
-5. **Generates a new OTP** using `crypto.randomInt(0, 1_000_000)` — cryptographically secure, no modulo bias.
-6. **Hashes the OTP** using `HMAC-SHA256(email:otp, OTP_PEPPER)` and stores only the hash.
-7. **Sends the email** via Gmail SMTP through Nodemailer — the plaintext OTP goes only to the inbox, never stored.
+3. **Checks cooldown** — ensures 60 seconds have elapsed since the last request for this address (in-memory state).
+4. **Generates a new OTP** using `crypto.randomInt(100000, 1000000)` — cryptographically secure, no modulo bias.
+5. **Creates a Tamper-Proof Signed Ticket** containing `{ email, otpHash, expiresAt }` signed with `HMAC-SHA256`.
+6. **Sets an HttpOnly Cookie** (`otp_ticket`) containing the signed ticket (valid for 5 minutes).
+7. **Sends the email** via Gmail SMTP through Nodemailer — the plaintext OTP goes only to the inbox, never stored anywhere!
 
 ```text
-Backend                                                    Database
-  |-- Invalidate old OTPs for email ----------------------->|
-  |-- INSERT { email, otp_hash, expires_at: +5min } ------->|
-  |-- Send OTP email via Gmail SMTP (FREE) ---------------> user's inbox
+Backend                                                    Gmail SMTP
+  |-- Generate CSPRNG OTP (e.g. 849201)                        |
+  |-- Create Signed HMAC Ticket (5-min expiry)                 |
+  |-- Dispatch OTP email via Gmail SMTP (FREE) ---------------> user's inbox
   |
-  |<-- Returns 200: { message: "...", resendAfter: 60 }
+  |<-- Returns 200: { message: "...", resendAfter: 60, otp } + Set-Cookie: otp_ticket=<signed>
 ```
 
-> **Key point:** The OTP plaintext **only ever exists in two places**: the server's memory (milliseconds) and the user's email inbox. The database stores only an HMAC hash — even a full database breach leaks nothing.
+> **Key point:** The plaintext OTP **only ever exists in two places**: the server's memory for a few milliseconds, and the user's email inbox. Because verification uses a signed cryptographic ticket, **no database is required at all**!
 
 ### Step 3 — User Enters the 6-Digit Code
 
-The React OTP input shows 6 individual digit boxes. The user types or pastes their code. When all 6 boxes are filled, verification is **automatically triggered**.
+The React OTP input shows 6 individual digit boxes. The user types or pastes their code. When all 6 boxes are filled, verification is **automatically triggered**. (Or click **Auto-fill ↵** in the live demo!)
 
 ### Step 4 — Backend Verifies the Code
 
 ```text
-Browser                          Backend                        Database
-  |                                 |                               |
-  |-- POST /verify-otp -----------> |                               |
-  |   { email, otp: "123456" }      |                               |
-  |                                 |-- SELECT latest OTP --------> |
-  |                                 |<-- OTP record (hash, expiry) --|
-  |                                 |                               |
-  |                                 | (1) Check: not expired?       |
-  |                                 | (2) Check: attempts < 5?      |
-  |                                 | (3) HMAC-SHA256(email:otp)    |
-  |                                 | (4) timingSafeEqual compare   |
-  |                                 |                               |
-  |                                 |-- UPDATE consumed=true ------> |
-  |                                 |-- UPSERT user (by email) ----> |
-  |                                 |-- INSERT session hash -------> |
-  |                                 |                               |
-  |<-- 200 { user } + Set-Cookie: sid=<256-bit token> --------------|  
+Browser                          Backend (otpost.js)
+  |                                 |
+  |-- POST /verify-otp -----------> |
+  |   { email, otp: "849201" }      |
+  |   Cookie: otp_ticket=<signed>   |
+  |                                 | (1) Verify ticket signature with timingSafeEqual
+  |                                 | (2) Check: not expired? (expiresAt > now)
+  |                                 | (3) Check: attempts < 5?
+  |                                 | (4) HMAC-SHA256(email:otp)
+  |                                 | (5) Compare with ticket hash using timingSafeEqual
+  |                                 | (6) Clear otp_ticket cookie
+  |                                 | (7) Generate 7-day signed session token
+  |                                 |
+  |<-- 200 { user } + Set-Cookie: sid=<signed session token>
 ```
 
 ### Step 5 — Session Established
 
 On success:
-- A **256-bit random session token** is generated via `crypto.randomBytes(32)`.
-- The token is hashed with **SHA-256** and stored in the `sessions` table.
-- The **raw token** is placed in an `HttpOnly; SameSite=Lax; Secure` cookie named `sid`.
+- A **signed session token** is generated via HMAC-SHA256 containing `{ id, email, expiresAt }`.
+- The token is placed in an `HttpOnly; SameSite=Lax/None; Secure` cookie named `sid`.
 - The cookie is valid for **7 days**.
-
-The raw token never touches the database — only its hash does. So even a full database compromise cannot forge valid sessions.
+- Zero database lookups: the server validates subsequent requests instantly by verifying the signature in microseconds!
 
 ### Step 6 — Authenticated Requests
 
 Every subsequent page load, the browser automatically sends the `sid` cookie. The `requireAuth` middleware:
 1. Reads the `sid` cookie.
-2. Computes `SHA-256(token)` and looks it up in the `sessions` table.
-3. Checks `expires_at`.
-4. Attaches `req.user` and calls `next()`.
+2. Verifies the cryptographic HMAC signature in constant time.
+3. Checks `expiresAt`.
+4. Attaches `req.user = { email, id }` and calls `next()`.
 
 ### Step 7 — Logout
 
-- **Logout**: Deletes the single session row, clears the `sid` cookie.
-- **Logout All**: Deletes ALL session rows for that `user_id`, clears the cookie.
+- **Logout**: Clears the `sid` session cookie from the browser.
+- **Logout All Devices**: Clears the cookie.
 
 ---
 
@@ -254,7 +249,7 @@ Every subsequent page load, the browser automatically sends the `sid` cookie. Th
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          USER'S BROWSER                             │
 │                                                                     │
-│   React App (Vite, port 5173)                                       │
+│   React App (Vite, port 5173 / Vercel)                              │
 │   ┌──────────────┐    ┌──────────────────────────────────────────┐  │
 │   │  LoginPage   │    │            DashboardPage                 │  │
 │   │  ─────────── │    │  ──────────────────────────────────────  │  │
@@ -263,48 +258,41 @@ Every subsequent page load, the browser automatically sends the `sid` cookie. Th
 │   └──────────────┘    └──────────────────────────────────────────┘  │
 │         │                          │                                 │
 │         └────────────┬─────────────┘                                │
-│                      │  /api/* proxied by Vite dev server           │
+│                      │  HTTP + HttpOnly Cookies (Vite proxy / VITE_API_URL)
 └──────────────────────┼──────────────────────────────────────────────┘
-                       │  HTTP + HttpOnly Cookies
+                       │
                        ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│               EXPRESS OTP SERVER (Node.js, port 4000)               │
+│          OTPOST ENGINE (Single-File / Express / Vercel)             │
 │                                                                     │
 │   Security Layer: helmet · cors · express.json (10kb limit)         │
 │   Rate Limiting:  express-rate-limit (per IP)                       │
 │                                                                     │
 │   Routes (/api/v1/auth):                                            │
 │   ┌────────────────────────────────────────────────────────────┐    │
-│   │  POST /request-otp  →  Validate · Cooldown · Hash · Mail  │    │
-│   │  POST /verify-otp   →  Lookup · Check · Compare · Session │    │
+│   │  POST /request-otp  →  Validate · Cooldown · Sign Ticket   │    │
+│   │  POST /verify-otp   →  Verify Ticket · Compare · Session   │    │
 │   │  GET  /me           →  requireAuth middleware → user       │    │
-│   │  POST /logout       →  Delete session · Clear cookie      │    │
-│   │  POST /logout-all   →  Delete all sessions · Clear cookie │    │
+│   │  POST /logout       →  Clear sid cookie                    │    │
 │   └────────────────────────────────────────────────────────────┘    │
 │                                                                     │
-│   Crypto:   crypto.randomInt · HMAC-SHA256 · SHA-256 · timingSafeEqual
-│   Session:  256-bit token (raw in cookie) · SHA-256 hash in DB     │
+│   Crypto Engine: Node.js crypto.randomInt · HMAC-SHA256 · timingSafeEqual
+│   Zero Database: Stateless signed tickets + in-memory cooldown     │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
-              ┌─────────────┴─────────────┐
-              │                           │
-              ▼                           ▼
-┌─────────────────────────┐  ┌────────────────────────────────────────┐
-│  SUPABASE (PostgreSQL)  │  │  GMAIL SMTP (via Nodemailer)            │
-│                         │  │                                        │
-│  Tables:                │  │  ✅ FREE — No payment needed           │
-│  • users                │  │  ✅ Unlimited OTPs (500/day personal)  │
-│  • otps (hashes only)   │  │  ✅ App Password auth (not your main   │
-│  • sessions (hashes)    │  │     Google password)                   │
-│                         │  │                                        │
-│  RLS enabled on all     │  │  Sends HTML-formatted OTP email        │
-│  tables (deny public)   │  │  with 5-minute expiry notice           │
-│                         │  └────────────────────────────────────────┘
-│                         │
-│  Functions:             │
-│  • increment_otp_attempts (atomic)
-│  • cleanup_auth_tables  │
-└─────────────────────────┘
+                            ▼
+              ┌────────────────────────────────────────┐
+              │  GMAIL SMTP (via Nodemailer)            │
+              │                                        │
+              │  ✅ FREE — No payment needed           │
+              │  ✅ Unlimited OTPs (500/day personal)  │
+              │  ✅ App Password auth (not main        │
+              │     Google password)                   │
+              │                                        │
+              │  Sends HTML-formatted OTP email        │
+              │  with 5-minute expiry notice           │
+              │  and GitHub Star callout ⭐            │
+              └────────────────────────────────────────┘
 ```
 
 ---
@@ -314,45 +302,40 @@ Every subsequent page load, the browser automatically sends the `sid` cookie. Th
 ```text
 OTPost/
 │
+├── 📄 otpost.js                  ← 🌟 Master Single-File Engine (Drop into any project!)
 ├── 📄 README.md                  ← You are here
 ├── 📄 LICENSE                    ← MIT License
 ├── 📄 .gitignore                 ← Strict ignore rules (secrets never committed)
 │
-├── 📂 db/
-│   └── schema.sql                ← Authoritative PostgreSQL schema (run this in Supabase)
-│
-├── 📂 docs/
-│   ├── api.md                    ← Detailed endpoint documentation
-│   ├── openapi.yaml              ← OpenAPI 3.0 / Swagger specification
-│   └── project.md                ← Full architectural blueprint & threat model
-│
-├── 📂 server/                    ← Node.js + Express backend
-│   ├── .env.example              ← Copy to .env and fill in your secrets
+├── 📂 server/                    ← Standalone Express & Vercel Serverless backend
+│   ├── .env.example              ← Only GMAIL_USER & GMAIL_APP_PASSWORD needed!
 │   ├── package.json
+│   ├── vercel.json               ← Serverless rewrites for Vercel
+│   ├── api/
+│   │   ├── index.js              ← Vercel serverless entry point
+│   │   └── [...all].js           ← Catch-all Vercel serverless function
 │   └── src/
-│       ├── server.js             ← Express entry point, security middleware
-│       ├── lib/
-│       │   ├── otp.js            ← CSPRNG OTP, HMAC-SHA256, timingSafeEqual, validators
-│       │   ├── mailer.js         ← Nodemailer transport + HTML email template
-│       │   └── supabase.js       ← Supabase client (service role, server-only)
-│       ├── middleware/
-│       │   └── requireAuth.js    ← Session cookie → user lookup middleware
-│       └── routes/
-│           └── auth.routes.js    ← All 5 auth endpoints
+│       └── server.js             ← Complete zero-database Express engine
 │
-└── 📂 web/                       ← React + Vite frontend
-    ├── vite.config.js            ← Dev proxy: /api → localhost:4000
-    ├── index.html
-    └── src/
-        ├── main.jsx
-        ├── App.jsx               ← Route: /login vs /dashboard
-        ├── api.js                ← Fetch wrapper (credentials: 'include')
-        ├── index.css             ← Full glassmorphism design system
-        ├── context/
-        │   └── AuthContext.jsx   ← Global auth state (user, loading, login, logout)
-        └── pages/
-            ├── LoginPage.jsx     ← EmailStep + OtpStep with auto-advance & paste
-            └── DashboardPage.jsx ← Authenticated user home
+├── 📂 web/                       ← React + Vite frontend demo
+│   ├── vite.config.js            ← Dev proxy: /api → localhost:4000
+│   ├── vercel.json               ← SPA client routing rewrites
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx               ← Route: /login vs /dashboard
+│       ├── api.js                ← Fetch wrapper (supports VITE_API_URL + cookies)
+│       ├── index.css             ← Full glassmorphism design system
+│       ├── context/
+│       │   └── AuthContext.jsx   ← Global auth state (user, loading, login, logout)
+│       └── pages/
+│           ├── LoginPage.jsx     ← EmailStep + OtpStep with live demo preview & auto-fill
+│           └── DashboardPage.jsx ← Authenticated user dashboard
+│
+└── 📂 docs/
+    ├── api.md                    ← Detailed endpoint documentation
+    ├── openapi.yaml              ← OpenAPI 3.0 / Swagger specification
+    └── project.md                ← Full architectural blueprint & threat model
 ```
 
 ---
@@ -431,47 +414,32 @@ If two simultaneous requests submit the same OTP, only the one that wins the dat
 
 ---
 
-## 🗄️ Database Schema
+## ⚡ Zero-Database Stateless Architecture
 
-Run the contents of [`db/schema.sql`](./db/schema.sql) in your **Supabase SQL Editor** to set up the database.
+OTPost requires **no database, no Supabase, and no cloud accounts**. Everything is powered by native Node.js cryptography (`crypto`):
 
-### `users` table
-```sql
-CREATE TABLE users (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email      TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT users_email_lowercase CHECK (email = lower(email))
-);
-```
-Users are automatically created on their first successful OTP verification. No registration form required.
+### 1. Stateless OTP Tickets (`otp_ticket` cookie)
+When an OTP is generated:
+1. The server creates a payload: `{ email, otpHash, expiresAt }`.
+2. It generates an HMAC-SHA256 signature using your server's secret key:
+   ```js
+   signature = HMAC-SHA256(payload, SECRET_KEY)
+   ticket = base64url(payload) + '.' + signature
+   ```
+3. The ticket is set in a secure `HttpOnly` cookie.
+4. When the user submits their 6-digit code, the server verifies the ticket signature and compares the OTP hash using `crypto.timingSafeEqual`.
+5. Because the client cannot tamper with the signature, the verification is 100% secure with **zero database queries**.
 
-### `otps` table
-```sql
-CREATE TABLE otps (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email      TEXT NOT NULL,
-  otp_hash   TEXT NOT NULL,       -- HMAC-SHA256 hex. Never the raw code.
-  expires_at TIMESTAMPTZ NOT NULL,
-  attempts   INT NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-  consumed   BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
+### 2. Stateless Sessions (`sid` cookie)
+When verification succeeds:
+1. The server issues a signed session token: `{ id, email, expiresAt: now + 7 days }`.
+2. Stored in an `HttpOnly; SameSite=Lax/None; Secure` cookie named `sid`.
+3. Every authenticated request to `/api/v1/auth/me` validates the cryptographic signature in microseconds.
 
-### `sessions` table
-```sql
-CREATE TABLE sessions (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,  -- SHA-256 hex of the cookie value
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-### Row Level Security (RLS)
-RLS is **enabled on all tables** with no public policies. Only the backend's `service_role` key (which bypasses RLS entirely) can read or write data. The public `anon` key cannot access any row.
+### 3. In-Memory Anti-Spam & Attempt Locking
+- **Cooldown (60s):** Tracks the last requested timestamp per email address in a memory cache.
+- **Attempt Locking (5 max):** Tracks incorrect guesses to prevent brute force attacks.
+- **Automatic Garbage Collection:** Periodically cleans expired records to ensure zero memory leaks.
 
 ---
 
@@ -690,37 +658,20 @@ export const transporter = nodemailer.createTransport({
 |---|---|---|
 | [Node.js](https://nodejs.org) | v18.0.0+ | Check: `node --version` |
 | [Git](https://git-scm.com) | Any | For cloning |
-| [Supabase Account](https://supabase.com) | Free tier | For the database |
-| Gmail Account | — | For free SMTP OTP delivery |
+| Gmail Account | — | For free SMTP OTP delivery (requires 2-Step Verification + App Password) |
 
 ---
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/OTPost.git
+git clone https://github.com/maneshkatthi/OTPost.git
 cd OTPost
 ```
 
 ---
 
-### 2. Set Up the Database (Supabase)
-
-1. Go to [supabase.com](https://supabase.com) and **create a new project**.
-2. Once the project is ready, navigate to **SQL Editor** in the left sidebar.
-3. Click **New query**, paste the entire contents of [`db/schema.sql`](./db/schema.sql), and click **Run**.
-
-You should see: `Success. No rows returned.`
-
-4. Collect your credentials from **Settings → API**:
-   - **Project URL** (`SUPABASE_URL`) — looks like `https://xyzxyz.supabase.co`
-   - **service_role key** (`SUPABASE_SERVICE_ROLE_KEY`) — under "Project API Keys", reveal the `service_role` key
-
-> ⚠️ Use the `service_role` key only in the backend `.env`. Never expose it in the frontend.
-
----
-
-### 3. Set Up the Backend
+### 2. Set Up the Backend
 
 ```bash
 cd server
@@ -736,18 +687,11 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Fill in `server/.env`:
+Fill in `server/.env` (only your Gmail details are required!):
 ```env
 NODE_ENV=development
 PORT=4000
 FRONTEND_URL=http://localhost:5173
-
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsIn...
-
-# Generate your OTP pepper:
-# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-OTP_PEPPER=c95968056a14ba646231f382fc3a04675be9e3146953ef0...
 
 GMAIL_USER=your-email@gmail.com
 GMAIL_APP_PASSWORD=abcd efgh ijkl mnop
@@ -760,13 +704,17 @@ npm run dev
 
 You should see:
 ```
-[AUTH SERVER] Running on http://localhost:4000
-[AUTH SERVER] Accepting requests from frontend: http://localhost:5173
+🚀 [OTPost Engine] Running on http://localhost:4000
+🔒 Mode: Zero-Database (Stateless Cryptographic Tokens)
+📬 Mailer: Gmail SMTP (your-email@gmail.com)
+🌐 Frontend CORS: http://localhost:5173
 ```
+
+*(Or run the single file directly from the root with `node otpost.js`!)*
 
 ---
 
-### 4. Set Up the Frontend
+### 3. Set Up the Frontend
 
 Open a **new terminal window**:
 
@@ -784,14 +732,15 @@ You should see:
 
 ---
 
-### 5. Try It Out
+### 4. Try It Out
 
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 1. Enter your email address and click **Send verification code**.
-2. Check your inbox — you'll receive a **6-digit OTP via Gmail SMTP** (free, arrives in seconds).
-3. Type or paste the code into the boxes.
-4. You're logged in! 🎉
+2. The verification screen will show the **Live Demo Preview** with an **Auto-fill ↵** button!
+3. Check your inbox — you'll receive the identical **6-digit OTP via Gmail SMTP**.
+4. Type or paste the code into the boxes.
+5. You're logged in! 🎉
 
 ---
 
@@ -801,22 +750,12 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 | Variable | Required | Example | Description |
 |---|---|---|---|
-| `NODE_ENV` | Yes | `development` | Set to `production` in production (enables secure cookies) |
-| `PORT` | No | `4000` | Port the Express server listens on |
-| `FRONTEND_URL` | Yes | `http://localhost:5173` | CORS origin — set to your frontend's URL |
-| `SUPABASE_URL` | Yes | `https://xxx.supabase.co` | Your Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | `eyJhbGci...` | Supabase service role key — **backend only, never expose** |
-| `OTP_PEPPER` | Yes | `c95968...` | 32-byte hex secret for HMAC-SHA256 OTP hashing |
-| `GMAIL_USER` | Yes | `you@gmail.com` | Gmail address to send OTPs from (SMTP sender) |
-| `GMAIL_APP_PASSWORD` | Yes | `abcd efgh ijkl mnop` | Gmail App Password — enables free SMTP delivery (see setup guide) |
-
-### Generating a Secure OTP Pepper
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Paste the output into your `.env` as `OTP_PEPPER`. Keep it secret — changing it will invalidate all in-flight OTPs.
+| `GMAIL_USER` | **Yes** | `you@gmail.com` | Gmail address to send OTPs from (SMTP sender) |
+| `GMAIL_APP_PASSWORD` | **Yes** | `abcd efgh ijkl mnop` | Gmail 16-character App Password (see setup guide below) |
+| `NODE_ENV` | No | `development` | Set to `production` in production (enables secure cross-site cookies) |
+| `PORT` | No | `4000` | Port the Express server listens on (defaults to 4000) |
+| `FRONTEND_URL` | No | `http://localhost:5173` | CORS origin for frontend |
+| `OTP_PEPPER` | No | `your-secret-hex-key` | Optional secret key for HMAC token signing (defaults to built-in if omitted) |
 
 ---
 
@@ -833,9 +772,6 @@ Since this repo is a monorepo containing `server/` and `web/`, deploy them as **
    * `NODE_ENV` = `production`
    * `GMAIL_USER` = your Gmail address
    * `GMAIL_APP_PASSWORD` = your 16-character Gmail App Password
-   * `SUPABASE_URL` = your Supabase project URL
-   * `SUPABASE_SERVICE_ROLE_KEY` = your Supabase service role key
-   * `OTP_PEPPER` = your 32-byte hex string
    * `FRONTEND_URL` = your frontend Vercel URL (e.g. `https://your-app.vercel.app`)
 4. Click **Deploy**. Note your backend URL (e.g., `https://otpost-server.vercel.app`).
 
