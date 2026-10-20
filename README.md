@@ -45,7 +45,7 @@ You (or your app)  →  OTPost  →  Gmail sends the code  →  User's inbox �
 If you use AI coding tools (Cursor, Copilot, Windsurf, Claude Code, Antigravity, etc.), you don't even need to figure out the code yourself. Just pick your scenario and paste the prompt:
 
 ### Scenario 1 — "I already have an app, I just want the OTP logic" (No frontend needed)
-> *"Look at the repository https://github.com/maneshkatthi/OTPost. I do NOT need the `web/` frontend folder. Extract just the backend OTP generation, Gmail SMTP mailer (`server/src/lib/`), and the Supabase SQL schema (`db/schema.sql`) and integrate it directly into my current project using my Gmail credentials."*
+> *"Look at `otpost.js` in the repository https://github.com/maneshkatthi/OTPost. It is a single self-contained file with the complete OTP generation and Gmail SMTP sender (no database or Supabase needed). Integrate `otpost.js` into my project using my Gmail credentials."*
 
 ### Scenario 2 — "I want to run the whole project to test it out"
 > *"Clone https://github.com/maneshkatthi/OTPost and set it up locally for me. Follow the README to install dependencies for both `server/` and `web/`, create the `.env` file, and run both dev servers so I can test OTP login in my browser."*
@@ -58,25 +58,17 @@ You don't have to use everything in this repository! Here is how to take only wh
 
 ```
 OTPost/
-├── 📂 server/    ← ⚡ THE CORE ENGINE (OTP generator, HMAC hasher, Gmail SMTP sender)
-├── 📂 db/        ← 🗄️ DATABASE (PostgreSQL / Supabase schema for OTP & session storage)
-├── 📂 web/        ← 🎨 OPTIONAL DEMO (A React frontend to test the flow visually)
-└── 📂 docs/       ← 📖 API SPECS (OpenAPI / Swagger docs)
+├── 📄 otpost.js   ← 🌟 ALL-IN-ONE SINGLE FILE (Complete OTP engine, zero database needed!)
+├── 📂 server/     ← ⚡ Standalone Express / Vercel Serverless Backend
+├── 📂 web/        ← 🎨 Optional React Frontend Demo
+└── 📂 db/         ← 🗄️ Optional PostgreSQL schema (only if you want a SQL database)
 ```
 
 | If your goal is... | What to do |
 |---|---|
-| **I only want the backend OTP API** | Clone the repo, take the `server/` and `db/` folders, and **delete `web/`**. Your backend is 100% standalone and works with any frontend (React, Next.js, Flutter, Vue, mobile apps, etc.). |
-| **I want to copy just the core logic into my own server** | You only need 3 files: <br>1. `server/src/lib/otp.js` (CSPRNG generation + HMAC hash) <br>2. `server/src/lib/mailer.js` (Nodemailer Gmail SMTP sender) <br>3. `db/schema.sql` (Database tables) |
+| **I want the entire OTP backend in 1 file** | Literally just copy **`otpost.js`** into your project! It has crypto generation, Gmail SMTP mailing, attempt tracking, and session verification built in. **Zero database or Supabase required.** |
+| **I only want the backend API** | Clone the repo, use the `server/` folder, and **delete `web/`**. Your backend is 100% standalone and works with any frontend (React, Next.js, Flutter, Vue, mobile apps, etc.). |
 | **I want a full working demo out-of-the-box** | Run both `server/` and `web/` (see [Quick Start](#-local-development-setup)). |
-
-> 💡 **Pro-Tip: Git Sparse Checkout (Clone without the `web/` folder)**
-> If you don't want to download the React frontend at all, run this in your terminal to download **only** `server` and `db`:
-> ```bash
-> git clone --filter=blob:none --sparse https://github.com/maneshkatthi/OTPost.git
-> cd OTPost
-> git sparse-checkout set server db
-> ```
 
 ---
 
