@@ -4,28 +4,37 @@
 
 ### Generate · Send · Verify — Free & Unlimited OTPs via SMTP
 
-**A production-ready OTP generation and delivery system powered by Gmail SMTP.**
+**A production-ready, zero-database OTP generation and delivery system powered by Gmail SMTP.**
 
-Built with Node.js + Express · React + Vite · Supabase (PostgreSQL) · Nodemailer
+Built with Node.js + Express · React + Vite · Zero-Database (Stateless Crypto) · Nodemailer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
+[![npm](https://img.shields.io/badge/CLI-npx%20otpost-blueviolet.svg)](https://github.com/maneshkatthi/OTPost)
 [![GitHub](https://img.shields.io/badge/GitHub-maneshkatthi%2FOTPost-181717?logo=github)](https://github.com/maneshkatthi/OTPost)
 
 </div>
 
 ---
 
-## 🚀 TL;DR — What is this?
+## 🚀 TL;DR — Quick Start in Seconds
 
 You know those **6-digit verification codes** you get from banks, Instagram, or WhatsApp when you log in? OTPost lets you **send those exact same codes** to any email address — **for free, with no limits** — using just a Gmail account.
 
-That's it. No paid services. No complex setup. Just clone this repo, plug in your Gmail, and you have a working OTP system.
+### ⚡ 1. Run Instantly with `npx` (No download needed!)
+```bash
+npx otpost
+```
+*Prompts for your Gmail + App Password, launches the server, and provides live API endpoints instantly.*
 
+### 💻 2. Or Run the Full-Stack Demo in 1 Command:
+```bash
+git clone https://github.com/maneshkatthi/OTPost.git
+cd OTPost
+npm run dev
 ```
-You (or your app)  →  OTPost  →  Gmail sends the code  →  User's inbox 📩
-```
+*Starts **both** backend and frontend concurrently in a single terminal!*
 
 ---
 
@@ -33,7 +42,7 @@ You (or your app)  →  OTPost  →  Gmail sends the code  →  User's inbox �
 
 | You are... | Why you'd want this |
 |---|---|
-| 🧑‍💻 **A vibe coder** building with AI agents | Drop this into your project and tell your AI agent *"add email OTP login using OTPost"* — it handles the rest |
+| 🧑‍💻 **A vibe coder** building with AI agents | Drop `otpost.js` into your project and tell your AI agent *"add email OTP login using OTPost"* — it handles the rest |
 | 📱 **Building a side project** that needs login | No need to pay for Auth0, Firebase, or Twilio — OTPost gives you OTP auth for $0 |
 | 🎓 **A student** learning backend development | See how real-world email delivery, cryptography, and API design actually work |
 | 🏗️ **A developer** who wants a starter template | Fork it, customize it, ship it — it's production-ready out of the box |
@@ -48,7 +57,7 @@ If you use AI coding tools (Cursor, Copilot, Windsurf, Claude Code, Antigravity,
 > *"Look at `otpost.js` in the repository https://github.com/maneshkatthi/OTPost. It is a single self-contained file with the complete OTP generation and Gmail SMTP sender (no database or Supabase needed). Integrate `otpost.js` into my project using my Gmail credentials."*
 
 ### Scenario 2 — "I want to run the whole project to test it out"
-> *"Clone https://github.com/maneshkatthi/OTPost and set it up locally for me. Follow the README to install dependencies for both `server/` and `web/`, create the `.env` file, and run both dev servers so I can test OTP login in my browser."*
+> *"Clone https://github.com/maneshkatthi/OTPost and run `npm run dev` in the root folder so both the backend and frontend start together. Here are my Gmail credentials: [your Gmail, App Password]."*
 
 ---
 
@@ -61,59 +70,68 @@ OTPost/
 ├── 📄 otpost.js   ← 🌟 ALL-IN-ONE SINGLE FILE (Complete OTP engine, zero database needed!)
 ├── 📂 server/     ← ⚡ Standalone Express / Vercel Serverless Backend
 ├── 📂 web/        ← 🎨 Optional React Frontend Demo
-└── 📂 db/         ← 🗄️ Optional PostgreSQL schema (only if you want a SQL database)
+└── 📂 scripts/    ← 🚀 1-Command full-stack launcher (npm run dev)
 ```
 
 | If your goal is... | What to do |
 |---|---|
-| **I want the entire OTP backend in 1 file** | Literally just copy **`otpost.js`** into your project! It has crypto generation, Gmail SMTP mailing, attempt tracking, and session verification built in. **Zero database or Supabase required.** |
+| **I want an instant OTP server right now** | Run **`npx otpost`** anywhere in your terminal. |
+| **I want the entire OTP backend in 1 file** | Literally just copy **`otpost.js`** into your project! It has crypto generation, Gmail SMTP mailing, attempt tracking, and session verification built in. **Zero database required.** |
 | **I only want the backend API** | Clone the repo, use the `server/` folder, and **delete `web/`**. Your backend is 100% standalone and works with any frontend (React, Next.js, Flutter, Vue, mobile apps, etc.). |
-| **I want a full working demo out-of-the-box** | Run both `server/` and `web/` (see [Quick Start](#-local-development-setup)). |
-
----
-
-## 🤔 What is OTPost?
-
-OTPost is a **complete OTP (One-Time Password) generation and delivery system** that generates secure 6-digit codes and sends them to any email address via **Gmail SMTP** — completely **free**.
-
-**In plain English:**
-- User enters their email → your server generates a random 6-digit code → Gmail delivers it to their inbox → user types the code → they're verified ✅
-- The codes **expire in 5 minutes**, can only be used **once**, and are **locked after 5 wrong guesses**
-- New users are **automatically registered** on their first successful verification — no signup form needed
-
-**Why it's worth your time:**
-- 💰 **$0 cost** — Gmail SMTP is free (500 emails/day personal, 2000/day with Google Workspace)
-- ⚡ **Works in minutes** — clone, configure Gmail, run
-- 🔒 **Actually secure** — codes are cryptographically generated and never stored in plain text
-- 🎨 **Looks good** — comes with a polished React UI with animations, auto-advancing inputs, and paste support
-- 🧩 **Plug and play** — use the full app, or just grab the backend API for your own frontend
-
-> **Key idea:** Gmail SMTP with an App Password gives you **unlimited free OTP emails** using just a standard Gmail account. No credit card, no API key purchase, no monthly limits.
+| **I want a full working demo out-of-the-box** | Run **`npm run dev`** from the root folder! |
 
 ---
 
 ## 📖 Table of Contents
 
-1. [TL;DR — What is this?](#-tldr--what-is-this)
-2. [Who is this for?](#-who-is-this-for)
-3. [Just Tell Your AI Agent](#-just-tell-your-ai-agent)
-4. [How to Use This Repo (Pick What You Need)](#-how-to-use-this-repo-pick-what-you-need)
-5. [What is OTPost?](#-what-is-otpost)
-6. [Why Gmail SMTP? (Free & Unlimited)](#-why-gmail-smtp-free--unlimited)
-7. [Feature Highlights](#-feature-highlights)
-8. [How It Works — The Complete OTP Flow](#-how-it-works--the-complete-otp-flow)
-9. [System Architecture](#-system-architecture)
-10. [Project Structure](#-project-structure)
-11. [Security Deep Dive](#-security-deep-dive)
-12. [Zero-Database Stateless Architecture](#-zero-database-stateless-architecture)
-13. [API Reference](#-api-reference)
-14. [Gmail SMTP Setup Guide](#-gmail-smtp-setup-guide)
-15. [Local Development Setup](#-local-development-setup)
-16. [Environment Variables Reference](#-environment-variables-reference)
-17. [Deployment Guide](#-deployment-guide)
-18. [Tech Stack](#-tech-stack)
-19. [Contributing](#-contributing)
-20. [License](#-license)
+1. [TL;DR — Quick Start](#-tldr--quick-start-in-seconds)
+2. [Instant CLI (npx otpost)](#-instant-cli-npx-otpost)
+3. [Who is this for?](#-who-is-this-for)
+4. [Just Tell Your AI Agent](#-just-tell-your-ai-agent)
+5. [How to Use This Repo (Pick What You Need)](#-how-to-use-this-repo-pick-what-you-need)
+6. [What is OTPost?](#-what-is-otpost)
+7. [Why Gmail SMTP? (Free & Unlimited)](#-why-gmail-smtp-free--unlimited)
+8. [Feature Highlights](#-feature-highlights)
+9. [How It Works — The Complete OTP Flow](#-how-it-works--the-complete-zero-database-flow)
+10. [System Architecture](#-system-architecture)
+11. [Project Structure](#-project-structure)
+12. [Security Deep Dive](#-security-deep-dive)
+13. [Zero-Database Stateless Architecture](#-zero-database-stateless-architecture)
+14. [API Reference](#-api-reference)
+15. [Gmail SMTP Setup Guide](#-gmail-smtp-setup-guide)
+16. [Local Development Setup](#-local-development-setup)
+17. [Environment Variables Reference](#-environment-variables-reference)
+18. [Deployment Guide](#-deployment-guide)
+19. [Tech Stack](#-tech-stack)
+20. [Contributing](#-contributing)
+21. [License](#-license)
+
+---
+
+## ⚡ Instant CLI (`npx otpost`)
+
+You don't even need to clone this repository or install anything to get a running OTP engine! Run it directly in any terminal:
+
+```bash
+npx otpost
+```
+
+* If your Gmail credentials aren't in your environment, it will prompt you interactively in the terminal.
+* It starts the full OTP authentication server in seconds with zero database setup.
+
+```bash
+# Provide credentials directly via flags:
+npx otpost --port 4000 --user you@gmail.com --pass "abcd efgh ijkl mnop"
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--port <number>` | Port the server listens on | `4000` |
+| `--user <email>` | Gmail sender address | Prompt / `process.env.GMAIL_USER` |
+| `--pass <password>` | 16-character Gmail App Password | Prompt / `process.env.GMAIL_APP_PASSWORD` |
+| `--cors <url>` | Allowed frontend origin | `*` |
+| `--help` | Show CLI help | — |
+| `--version` | Show version | — |
 
 ---
 

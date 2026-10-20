@@ -24,8 +24,6 @@ import crypto from 'crypto';
 const PORT = process.env.PORT || 4000;
 const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
 const SECRET_KEY = process.env.OTP_PEPPER || process.env.JWT_SECRET || 'otpost_default_super_secret_pepper_2026';
 const REPO_URL = 'https://github.com/maneshkatthi/OTPost';
 
@@ -34,11 +32,26 @@ const COOLDOWN_S = 60;               // 60 seconds
 const SESSION_TTL_MS = 7 * 24 * 3600_000; // 7 days
 const MAX_ATTEMPTS = 5;
 
-// Warn if Gmail credentials are not provided
-if (!GMAIL_USER || !GMAIL_PASS) {
+// Parse single or comma-separated Gmail accounts for rotation & failover
+function getGmailAccounts() {
+  const users = (process.env.GMAIL_USER || '').split(',').map((u) => u.trim()).filter(Boolean);
+  const passes = (process.env.GMAIL_APP_PASSWORD || '').split(',').map((p) => p.trim()).filter(Boolean);
+
+  return users.map((user, idx) => ({
+    user,
+    pass: passes[idx] || passes[0] || '',
+  })).filter(acc => acc.user && acc.pass);
+}
+
+const initialAccounts = getGmailAccounts();
+if (initialAccounts.length === 0) {
   console.warn('\n⚠️ [WARN] GMAIL_USER or GMAIL_APP_PASSWORD missing in environment!');
   console.warn('   Emails will not send until Gmail credentials are added in .env\n');
+} else {
+  console.log(`[MAILER] Configured ${initialAccounts.length} Gmail sender account(s) with auto-failover.`);
 }
+
+let currentAccountIndex = 0;
 
 // ── In-Memory Cooldown & Rate-Limit Cache ─────────────────────────────────────
 // Structure: email -> { lastRequestedAt: number, attempts: number }
@@ -110,21 +123,34 @@ function verifySignedToken(token, secret = SECRET_KEY) {
 }
 
 // ── Nodemailer Transport & HTML Email Template ───────────────────────────────
-const mailTransporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: GMAIL_USER,
-    pass: GMAIL_PASS,
-  },
-});
-
 async function sendOtpEmail(toEmail, otp) {
-  const mailOptions = {
-    from: `"OTPost Authentication" <${GMAIL_USER}>`,
-    to: toEmail,
-    subject: `${otp} is your OTPost verification code`,
-    text: `Your OTPost one-time login code is: ${otp}\n\nThis code will expire in 5 minutes.\n\nStar us on GitHub: ${REPO_URL}`,
-    html: `
+  const accounts = getGmailAccounts();
+  if (accounts.length === 0) {
+    throw new Error('No Gmail accounts configured. Add GMAIL_USER and GMAIL_APP_PASSWORD in .env');
+  }
+
+  let lastError = null;
+
+  // Try each account in pool with failover
+  for (let i = 0; i < accounts.length; i++) {
+    const accIdx = (currentAccountIndex + i) % accounts.length;
+    const currentAccount = accounts[accIdx];
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: currentAccount.user,
+          pass: currentAccount.pass,
+        },
+      });
+
+      const mailOptions = {
+        from: `"OTPost Authentication" <${currentAccount.user}>`,
+        to: toEmail,
+        subject: `${otp} is your OTPost verification code`,
+        text: `Your OTPost one-time login code is: ${otp}\n\nThis code will expire in 5 minutes.\n\nStar us on GitHub: ${REPO_URL}`,
+        html: `
       <!DOCTYPE html>
       <html>
       <head>
@@ -207,9 +233,18 @@ async function sendOtpEmail(toEmail, otp) {
       </body>
       </html>
     `,
-  };
+      };
 
-  return mailTransporter.sendMail(mailOptions);
+      const info = await transporter.sendMail(mailOptions);
+      currentAccountIndex = (accIdx + 1) % accounts.length;
+      return info;
+    } catch (err) {
+      console.warn(`[WARN] Delivery failed on ${currentAccount.user}: ${err.message}. Trying next account...`);
+      lastError = err;
+    }
+  }
+
+  throw lastError;
 }
 
 // ── Express Application Setup ────────────────────────────────────────────────

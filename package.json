@@ -1,0 +1,46 @@
+{
+  "name": "otpost",
+  "version": "1.0.0",
+  "description": "Zero-database, free and unlimited email OTP authentication engine powered by Gmail SMTP",
+  "main": "otpost.js",
+  "type": "module",
+  "bin": {
+    "otpost": "./bin/cli.js"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "start": "node otpost.js",
+    "install:all": "npm install --prefix server && npm install --prefix web",
+    "build": "npm run build --prefix web"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "nodemailer": "^7.0.7"
+  },
+  "keywords": [
+    "otp",
+    "auth",
+    "passwordless",
+    "gmail",
+    "smtp",
+    "zero-database",
+    "email-otp",
+    "login",
+    "authentication"
+  ],
+  "author": "Manesh Katthi <maneshkatthi@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maneshkatthi/OTPost.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maneshkatthi/OTPost/issues"
+  },
+  "homepage": "https://github.com/maneshkatthi/OTPost#readme"
+}
