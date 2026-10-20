@@ -16,9 +16,26 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // Cross-Origin Resource Sharing with credentials enabled
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: frontendUrl,
+    origin: (origin, callback) => {
+      // allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
   })
 );
@@ -58,7 +75,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`[AUTH SERVER] Running on http://localhost:${port}`);
-  console.log(`[AUTH SERVER] Accepting requests from frontend: ${frontendUrl}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`[AUTH SERVER] Running on http://localhost:${port}`);
+    console.log(`[AUTH SERVER] Accepting requests from frontend: ${frontendUrl}`);
+  });
+}
+
+export default app;

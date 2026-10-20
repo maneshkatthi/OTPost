@@ -828,25 +828,34 @@ Paste the output into your `.env` as `OTP_PEPPER`. Keep it secret — changing i
 
 ---
 
-## 🌐 Deployment Guide
+## 🌐 Deployment Guide (Vercel, Render, Railway)
 
-### Backend — Deploy to Railway / Render / Fly.io
+### Deploying to Vercel (Recommended)
 
-1. Push your code to GitHub.
-2. Create a new service pointing to the `server/` directory.
-3. Set all environment variables from `server/.env` in the platform's dashboard.
-4. Set `NODE_ENV=production`.
-5. Set start command to `npm start` (runs `node src/server.js`).
-6. Set `FRONTEND_URL` to your deployed frontend URL.
+Since this repo is a monorepo containing `server/` and `web/`, deploy them as **two separate projects** in your Vercel dashboard:
 
-### Frontend — Deploy to Vercel / Netlify
+#### 1. Deploy the Backend (`server/`)
+1. In Vercel, click **Add New Project** and select your `OTPost` repository.
+2. In **Root Directory**, click Edit and select **`server`**.
+3. Under **Environment Variables**, add:
+   * `NODE_ENV` = `production`
+   * `GMAIL_USER` = your Gmail address
+   * `GMAIL_APP_PASSWORD` = your 16-character Gmail App Password
+   * `SUPABASE_URL` = your Supabase project URL
+   * `SUPABASE_SERVICE_ROLE_KEY` = your Supabase service role key
+   * `OTP_PEPPER` = your 32-byte hex string
+   * `FRONTEND_URL` = your frontend Vercel URL (e.g. `https://your-app.vercel.app`)
+4. Click **Deploy**. Note your backend URL (e.g., `https://otpost-server.vercel.app`).
 
-1. Create a new project pointing to the `web/` directory.
-2. Build command: `npm run build`
-3. Output directory: `dist`
-4. Update `vite.config.js` proxy to point to your deployed backend URL (for production, configure a reverse proxy or update the API base URL in `api.js`).
+#### 2. Deploy the Frontend (`web/`)
+1. In Vercel, click **Add New Project** and select the same `OTPost` repository again.
+2. In **Root Directory**, click Edit and select **`web`**.
+3. Under **Environment Variables**, add:
+   * `VITE_API_URL` = `https://otpost-server.vercel.app` *(your backend URL from Step 1, without trailing slash)*
+4. Click **Deploy**.
 
-> **Production tip:** In production, you'll want to serve the React build from the same origin as the API, or configure CORS and cookie `domain` appropriately for cross-origin setups.
+> 💡 **Why did `Unexpected token 'T'` happen before?**  
+> If `VITE_API_URL` is missing, the frontend attempts to call `/api/v1/auth/...` on the frontend domain itself. Vercel returns its default HTML 404 page ("**T**he page could not be found"), which fails when parsed as JSON. Setting `VITE_API_URL` points requests directly to your backend!
 
 ---
 

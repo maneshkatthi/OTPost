@@ -19,12 +19,12 @@ const OTP_TTL_MS = 5 * 60_000; // 5 minutes
 const SESSION_TTL_MS = 7 * 24 * 3600_000; // 7 days
 const COOLDOWN_S = 60; // 60 seconds
 const MAX_ATTEMPTS = 5;
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
 
 const cookieOpts = {
   httpOnly: true,
   secure: isProd,
-  sameSite: 'lax',
+  sameSite: isProd ? 'none' : 'lax',
   path: '/',
 };
 
